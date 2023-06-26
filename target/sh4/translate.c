@@ -2285,6 +2285,24 @@ static void sh4_tr_insn_start(DisasContextBase *dcbase, CPUState *cs)
     tcg_gen_insn_start(ctx->base.pc_next, ctx->envflags);
 }
 
+#ifdef HAS_TRACEWRAP
+static inline void gen_trace_newframe(uint32_t pc)
+{
+    TCGv_i32 tmp0 = tcg_temp_new_i32();
+    tcg_gen_movi_i32(tmp0, pc);
+    gen_helper_trace_newframe(tmp0);
+    tcg_temp_free_i32(tmp0);
+}
+
+static inline void gen_trace_endframe(uint32_t pc)
+{
+    TCGv_i32 tmp0 = tcg_temp_new_i32();
+    tcg_gen_movi_i32(tmp0, pc);
+    gen_helper_trace_endframe(cpu_env, tmp0);
+    tcg_temp_free_i32(tmp0);
+}
+#endif /* HAS_TRACEWRAP */
+
 static void sh4_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
 {
     CPUSH4State *env = cs->env_ptr;
@@ -2303,9 +2321,18 @@ static void sh4_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
     }
 #endif
 
+#ifdef HAS_TRACEWRAP
+    gen_trace_newframe(ctx->base.pc_next);
+#endif
+
     ctx->opcode = translator_lduw(env, &ctx->base, ctx->base.pc_next);
     decode_opc(ctx);
     ctx->base.pc_next += 2;
+
+#ifdef HAS_TRACEWRAP
+    gen_trace_endframe(ctx->base.pc_next);
+#endif
+
 }
 
 static void sh4_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)

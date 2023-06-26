@@ -41,3 +41,8 @@ DEF_HELPER_FLAGS_2(ftrc_FT, TCG_CALL_NO_WG, i32, env, f32)
 DEF_HELPER_FLAGS_2(ftrc_DT, TCG_CALL_NO_WG, i32, env, f64)
 DEF_HELPER_3(fipr, void, env, i32, i32)
 DEF_HELPER_2(ftrv, void, env, i32)
+
+#ifdef HAS_TRACEWRAP
+DEF_HELPER_1(trace_newframe, void, i32)
+DEF_HELPER_2(trace_endframe, void, env, i32)
+#endif /* HAS_TRACEWRAP */

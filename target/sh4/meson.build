@@ -7,6 +7,10 @@ sh4_ss.add(files(
   'translate.c',
 ))
 
+if get_option('tracewrap')
+  sh4_ss.add(files('trace_helper.c'))
+endif
+
 sh4_softmmu_ss = ss.source_set()
 sh4_softmmu_ss.add(files('monitor.c'))
 
