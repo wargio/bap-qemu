@@ -70,6 +70,74 @@ static const char reg_names[NUMBER_OF_CPU_REGISTERS][8] = {
 };
 #define REG(x) (cpu_r[x])
 
+
+#ifdef HAS_TRACEWRAP
+#include <frame_arch.h>
+
+static inline void gen_trace_newframe(uint64_t pc)
+{
+    TCGv_i64 tmp0 = tcg_temp_new_i64();
+    tcg_gen_movi_i64(tmp0, pc);
+    gen_helper_trace_newframe(tmp0);
+    tcg_temp_free_i64(tmp0);
+}
+
+static inline void gen_trace_endframe(uint64_t pc)
+{
+    TCGv_i64 tmp0 = tcg_temp_new_i64();
+    tcg_gen_movi_i64(tmp0, pc);
+    gen_helper_trace_endframe(cpu_env, tmp0);
+    tcg_temp_free_i64(tmp0);
+}
+
+static void gen_trace_load_reg(int reg)
+{
+    TCGv_i32 t = tcg_const_i32(reg);
+    gen_helper_trace_load_reg(t, REG(reg));
+    tcg_temp_free_i32(t);
+}
+
+static void gen_trace_store_reg(int reg)
+{
+    TCGv_i32 t = tcg_const_i32(reg);
+    gen_helper_trace_store_reg(t, REG(reg));
+    tcg_temp_free_i32(t);
+}
+#endif /* HAS_TRACEWRAP */
+
+static inline void log_load_mem(TCGv addr, TCGv val, MemOp op) {
+    #ifdef HAS_TRACEWRAP
+    TCGv_i32 o = tcg_const_i32(op);
+    #ifdef TARGET_PPC64
+    gen_helper_trace_load_mem64(addr, val, o);
+    #else
+    gen_helper_trace_load_mem(addr, val, o);
+    #endif
+    tcg_temp_free_i32(o);
+    #endif
+}
+
+static inline void log_store_mem(TCGv addr, TCGv val, MemOp op) {
+    #ifdef HAS_TRACEWRAP
+    TCGv_i32 o = tcg_const_i32(op);
+    gen_helper_trace_store_mem(addr, val, o);
+    tcg_temp_free_i32(o);
+    #endif
+}
+
+static inline void log_load_gpr(uint32_t rx) {
+    #ifdef HAS_TRACEWRAP
+    gen_trace_load_reg(rx);
+    #endif
+}
+
+static inline void log_store_gpr(uint32_t rx) {
+    #ifdef HAS_TRACEWRAP
+    gen_trace_store_reg(rx);
+    #endif
+}
+
+
 #define DISAS_EXIT   DISAS_TARGET_0  /* We want return to the cpu main loop.  */
 #define DISAS_LOOKUP DISAS_TARGET_1  /* We have a variable condition exit.  */
 #define DISAS_CHAIN  DISAS_TARGET_2  /* We have a single condition exit.  */
@@ -310,7 +378,9 @@ static void gen_ZNSf(TCGv R)
 static bool trans_ADD(DisasContext *ctx, arg_ADD *a)
 {
     TCGv Rd = cpu_r[a->rd];
+    log_load_gpr(a->rd);
     TCGv Rr = cpu_r[a->rr];
+    log_load_gpr(a->rr);
     TCGv R = tcg_temp_new_i32();
 
     tcg_gen_add_tl(R, Rd, Rr); /* Rd = Rd + Rr */
@@ -323,6 +393,7 @@ static bool trans_ADD(DisasContext *ctx, arg_ADD *a)
 
     /* update output registers */
     tcg_gen_mov_tl(Rd, R);
+    log_store_gpr(a->rd);
 
     tcg_temp_free_i32(R);
 
@@ -2935,6 +3006,10 @@ static void avr_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
     DisasContext *ctx = container_of(dcbase, DisasContext, base);
     TCGLabel *skip_label = NULL;
 
+#ifdef HAS_TRACEWRAP
+    gen_trace_newframe(ctx->env);
+#endif
+
     /* Conditionally skip the next instruction, if indicated.  */
     if (ctx->skip_cond != TCG_COND_NEVER) {
         skip_label = gen_new_label();
@@ -2967,6 +3042,10 @@ static void avr_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
     translate(ctx);
 
     ctx->base.pc_next = ctx->npc * 2;
+
+#ifdef HAS_TRACEWRAP
+    gen_trace_endframe(ctx->env);
+#endif
 
     if (skip_label) {
         canonicalize_skip(ctx);

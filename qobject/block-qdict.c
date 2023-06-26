@@ -222,11 +222,11 @@ void qdict_array_split(QDict *src, QList **dst)
     *dst = qlist_new();
 
     for (i = 0; i < UINT_MAX; i++) {
-        QObject *subqobj;
-        bool is_subqdict;
+        QObject *subqobj = NULL;
+        bool is_subqdict = false;
         QDict *subqdict = NULL;
         char indexstr[32], prefix[32];
-        size_t snprintf_ret;
+        size_t snprintf_ret = 0;
 
         snprintf_ret = snprintf(indexstr, 32, "%u", i);
         assert(snprintf_ret < 32);

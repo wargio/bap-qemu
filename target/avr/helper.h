@@ -27,3 +27,12 @@ DEF_HELPER_3(outb, void, env, i32, i32)
 DEF_HELPER_2(inb, tl, env, i32)
 DEF_HELPER_3(fullwr, void, env, i32, i32)
 DEF_HELPER_2(fullrd, tl, env, i32)
+
+#ifdef HAS_TRACEWRAP
+DEF_HELPER_1(trace_newframe, void, i64)
+DEF_HELPER_2(trace_endframe, void, env, i64, i32)
+DEF_HELPER_3(trace_load_mem, void, i32, i32, i32)
+DEF_HELPER_3(trace_store_mem, void, i32, i32, i32)
+DEF_HELPER_2(trace_load_reg, void, i32, i32)
+DEF_HELPER_2(trace_store_reg, void, i32, i32)
+#endif /* HAS_TRACEWRAP */

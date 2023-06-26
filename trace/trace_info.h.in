@@ -1,0 +1,6 @@
+#pragma once
+
+#include "frame_arch.h"
+
+const uint64_t frame_arch = @SOFTMMU_FRAME_ARCH@;
+const uint64_t frame_mach = @SOFTMMU_FRAME_MACH@;

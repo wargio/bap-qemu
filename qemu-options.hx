@@ -3911,12 +3911,11 @@ ERST
 DEF("tracefile", HAS_ARG, QEMU_OPTION_tracefile, \
     "-tracefile file    write BAP traces to file\n",
     QEMU_ARCH_ARM)
-STEXI
-@item -tracefile @var{file}
-@findex -tracefile
-Write BAP traces into file @var{file}.
-Default: /dev/shm/proto
-ETEXI
+SRST
+``-tracefile filename
+    Write BAP traces into a file.
+    Default: /dev/shm/proto
+ERST
 
 DEF("mon", HAS_ARG, QEMU_OPTION_mon, \
     "-mon [chardev=]name[,mode=readline|control][,pretty[=on|off]]\n", QEMU_ARCH_ALL)

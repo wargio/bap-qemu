@@ -497,10 +497,16 @@ static int curl_init_state(BDRVCURLState *s, CURLState *state)
          *
          * Restricting protocols is only supported from 7.19.4 upwards.
          */
-#if LIBCURL_VERSION_NUM >= 0x071304
+#if LIBCURL_VERSION_NUM >= 0x075500
+        curl_easy_setopt(state->curl,
+                         CURLOPT_PROTOCOLS_STR, PROTOCOLS);
+        curl_easy_setopt(state->curl,
+                         CURLOPT_REDIR_PROTOCOLS_STR, PROTOCOLS);
+#elif LIBCURL_VERSION_NUM >= 0x071304
         curl_easy_setopt(state->curl, CURLOPT_PROTOCOLS, PROTOCOLS);
         curl_easy_setopt(state->curl, CURLOPT_REDIR_PROTOCOLS, PROTOCOLS);
 #endif
+
 
 #ifdef DEBUG_VERBOSE
         curl_easy_setopt(state->curl, CURLOPT_VERBOSE, 1);
@@ -768,9 +774,15 @@ static int curl_open(BlockDriverState *bs, QDict *options, int flags,
     curl_easy_setopt(state->curl, CURLOPT_HEADERDATA, s);
     if (curl_easy_perform(state->curl))
         goto out;
+#if LIBCURL_VERSION_NUM >= 0x073700
+    if (curl_easy_getinfo(state->curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &d)) {
+        goto out;
+    }
+#else
     if (curl_easy_getinfo(state->curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &d)) {
         goto out;
     }
+#endif
     /* Prior CURL 7.19.4 return value of 0 could mean that the file size is not
      * know or the size is zero. From 7.19.4 CURL returns -1 if size is not
      * known and zero if it is really zero-length file. */

@@ -130,7 +130,7 @@
 #include "config-host.h"
 
 #ifdef HAS_TRACEWRAP
-#include "gtracewrap.h"
+#include "tracewrap.h"
 #endif
 
 #define MAX_VIRTIO_CONSOLES 1
@@ -3678,7 +3678,23 @@ void qemu_init(int argc, char **argv, char **envp)
         }
     }
 #ifdef HAS_TRACEWRAP
-    do_qemu_set_trace(tracefile,0,NULL);
+    const char *exec_path = NULL;
+    DriveInfo *def_drive = drive_get(IF_DEFAULT, 0, 0);
+    if (!def_drive) {
+        exec_path = qdict_get_try_str(machine_opts_dict, "firmware");
+        if (!exec_path) {
+            error_report("cannot find -bios or default drive");
+            exit(1);
+        }
+    } else {
+        exec_path = qemu_opt_get(def_drive->opts, "driver");
+        if (!exec_path) {
+            error_report("invalid drive");
+            exit(1);
+        }
+    }
+
+    qemu_trace_init(tracefile, exec_path, NULL, NULL, NULL, NULL);
 #endif
 
     /*

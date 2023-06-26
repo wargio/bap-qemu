@@ -16,5 +16,9 @@ avr_ss.add(files(
 
 avr_softmmu_ss.add(files('machine.c'))
 
+if get_option('tracewrap')
+  avr_softmmu_ss.add(files('trace_helper.c'))
+endif
+
 target_arch += {'avr': avr_ss}
 target_softmmu_arch += {'avr': avr_softmmu_ss}

@@ -1970,6 +1970,22 @@ foreach target : target_dirs
                                                 configuration: config_devices_data)}
     config_target += config_devices
     config_all_devices += config_devices
+
+    softmmu_conf_archs = {
+      'avr': ['frame_arch_avr', 'frame_mach_avr1'],
+    }
+
+    softmmu_conf = softmmu_conf_archs[config_target['TARGET_NAME']]
+    trace_trace_info_h = configuration_data()
+    trace_trace_info_h.set('SOFTMMU_FRAME_ARCH', softmmu_conf[0])
+    trace_trace_info_h.set('SOFTMMU_FRAME_MACH', softmmu_conf[1])
+    config_devices_h += {target: configure_file(
+        input: 'trace/trace_info.h.in',
+        output: 'trace_info.h',
+        configuration: trace_trace_info_h,
+        install: false,
+      )}
+
   endif
   config_target_mak += {target: config_target}
 endforeach
