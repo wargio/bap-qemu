@@ -3,6 +3,7 @@
 #include "qemu/log.h"
 #include "exec/helper-proto.h"
 #include "exec/memop.h"
+#include "qemu/log.h"
 
 const char *regs[] = {
     "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
@@ -52,7 +53,7 @@ OperandInfo * load_store_reg(uint32_t reg, uint32_t val, int ls)
 
 void HELPER(trace_load_reg)(uint32_t reg, uint32_t val)
 {
-    // qemu_log("This register (r%d) was read. Value 0x%x\n", reg, val);
+    qemu_log("This register (r%d) was read. Value 0x%x\n", reg, val);
 
     //r0 always reads 0
     OperandInfo *oi = load_store_reg(reg, (reg != 0) ? val : 0, 0);
@@ -62,7 +63,7 @@ void HELPER(trace_load_reg)(uint32_t reg, uint32_t val)
 
 void HELPER(trace_store_reg)(uint32_t reg, uint32_t val)
 {
-    // qemu_log("This register (r%d) was written. Value: 0x%x\n", reg, val);
+    qemu_log("This register (r%d) was written. Value: 0x%x\n", reg, val);
 
     OperandInfo *oi = load_store_reg(reg, val, 1);
 
@@ -101,20 +102,16 @@ OperandInfo *load_store_mem(uint64_t addr, int ls, const void *data, size_t data
     return oi;
 }
 
-void HELPER(trace_ld)(CPUSH4State *env, uint32_t val, uint32_t addr)
+void HELPER(trace_load_mem)(uint32_t addr, uint32_t val, uint32_t op)
 {
-    // qemu_log("This was a read 0x%x addr:0x%x value:0x%x\n", env->active_tc.PC, addr, val);
-
-    OperandInfo *oi = load_store_mem(addr, 0, val, 4);
-
+    qemu_log("LOAD at 0x%lx size: %d data: 0x%lx\n", (unsigned long) addr, memop_size(op), (unsigned long) val);
+    OperandInfo *oi = load_store_mem(addr, 0, &val, memop_size(op));
     qemu_trace_add_operand(oi, 0x1);
 }
 
-void HELPER(trace_st)(CPUSH4State *env, uint32_t val, uint32_t addr)
+void HELPER(trace_store_mem)(uint32_t addr, uint32_t val, uint32_t op)
 {
-    // qemu_log("This was a store 0x%x addr:0x%x value:0x%x\n", env->active_tc.PC, addr, val);
-
-    OperandInfo *oi = load_store_mem(addr, 1, val, 4);
-
+    qemu_log("STORE at 0x%lx size: %d data: 0x%lx\n", (unsigned long) addr, memop_size(op), (unsigned long) val);
+    OperandInfo *oi = load_store_mem(addr, 1, &val, memop_size(op));
     qemu_trace_add_operand(oi, 0x2);
 }

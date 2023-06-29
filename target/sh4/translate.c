@@ -185,6 +185,66 @@ void superh_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     }
 }
 
+#ifdef HAS_TRACEWRAP
+static void gen_trace_load_reg(uint32_t reg, TCGv var)
+{
+    TCGv_i32 t = tcg_const_i32(reg);
+    gen_helper_trace_load_reg(t, var);
+    tcg_temp_free_i32(t);
+}
+
+static void gen_trace_store_reg(uint32_t reg, TCGv var)
+{
+    TCGv_i32 t = tcg_const_i32(reg);
+    gen_helper_trace_store_reg(t, var);
+    tcg_temp_free_i32(t);
+}
+
+static inline void gen_trace_newframe(uint32_t pc)
+{
+    TCGv_i32 tmp0 = tcg_temp_new_i32();
+    tcg_gen_movi_i32(tmp0, pc);
+    gen_helper_trace_newframe(tmp0);
+    tcg_temp_free_i32(tmp0);
+}
+
+static inline void gen_trace_endframe(uint32_t pc)
+{
+    TCGv_i32 tmp0 = tcg_temp_new_i32();
+    tcg_gen_movi_i32(tmp0, pc);
+    gen_helper_trace_endframe(cpu_env, tmp0);
+    tcg_temp_free_i32(tmp0);
+}
+#endif /* HAS_TRACEWRAP */
+
+static inline void log_load_gpr(uint32_t rx, TCGv var) {
+    #ifdef HAS_TRACEWRAP
+    gen_trace_load_reg(rx, var);
+    #endif
+}
+
+static inline void log_store_gpr(uint32_t rx, TCGv var) {
+    #ifdef HAS_TRACEWRAP
+    gen_trace_store_reg(rx, var);
+    #endif
+}
+
+static inline void log_load_mem(TCGv addr, TCGv val, MemOp op) {
+    #ifdef HAS_TRACEWRAP
+    TCGv_i32 o = tcg_const_i32(op);
+    gen_helper_trace_load_mem(addr, val, o);
+    tcg_temp_free_i32(o);
+    #endif
+}
+
+static inline void log_store_mem(TCGv addr, TCGv val, MemOp op) {
+    #ifdef HAS_TRACEWRAP
+    TCGv_i32 o = tcg_const_i32(op);
+    gen_helper_trace_store_mem(addr, val, o);
+    tcg_temp_free_i32(o);
+    #endif
+}
+
 static void gen_read_sr(TCGv dst)
 {
     TCGv t0 = tcg_temp_new();
@@ -238,6 +298,9 @@ static void gen_goto_tb(DisasContext *ctx, int n, target_ulong dest)
         tcg_gen_goto_tb(n);
         tcg_gen_movi_i32(cpu_pc, dest);
         tcg_gen_exit_tb(ctx->base.tb, n);
+        #ifdef HAS_TRACEWRAP
+        gen_trace_endframe(dest);
+        #endif
     } else {
         tcg_gen_movi_i32(cpu_pc, dest);
         if (use_exit_tb(ctx)) {
@@ -529,8 +592,9 @@ static void _decode_opc(DisasContext * ctx)
 	return;
     case 0xd000:		/* mov.l @(disp,PC),Rn */
 	{
-            TCGv addr = tcg_const_i32((ctx->base.pc_next + 4 + B7_0 * 4) & ~3);
-            tcg_gen_qemu_ld_i32(REG(B11_8), addr, ctx->memidx, MO_TESL);
+        TCGv addr = tcg_const_i32((ctx->base.pc_next + 4 + B7_0 * 4) & ~3);
+        tcg_gen_qemu_ld_i32(REG(B11_8), addr, ctx->memidx, MO_TESL);
+        log_load_mem(addr, REG(B11_8), MO_TESL);
 	    tcg_temp_free(addr);
 	}
 	return;
@@ -552,7 +616,7 @@ static void _decode_opc(DisasContext * ctx)
 
     switch (ctx->opcode & 0xf00f) {
     case 0x6003:		/* mov Rm,Rn */
-	tcg_gen_mov_i32(REG(B11_8), REG(B7_4));
+    	tcg_gen_mov_i32(REG(B11_8), REG(B7_4));
 	return;
     case 0x2000:		/* mov.b Rm,@Rn */
         tcg_gen_qemu_st_i32(REG(B7_4), REG(B11_8), ctx->memidx, MO_UB);
@@ -659,8 +723,8 @@ static void _decode_opc(DisasContext * ctx)
 	{
 	    TCGv addr = tcg_temp_new();
 	    tcg_gen_add_i32(addr, REG(B7_4), REG(0));
-            tcg_gen_qemu_ld_i32(REG(B11_8), addr, ctx->memidx, MO_TESL);
-	    tcg_temp_free(addr);
+        tcg_gen_qemu_ld_i32(REG(B11_8), addr, ctx->memidx, MO_TESL);
+ 	    tcg_temp_free(addr);
 	}
 	return;
     case 0x6008:		/* swap.b Rm,Rn */
@@ -2285,24 +2349,6 @@ static void sh4_tr_insn_start(DisasContextBase *dcbase, CPUState *cs)
     tcg_gen_insn_start(ctx->base.pc_next, ctx->envflags);
 }
 
-#ifdef HAS_TRACEWRAP
-static inline void gen_trace_newframe(uint32_t pc)
-{
-    TCGv_i32 tmp0 = tcg_temp_new_i32();
-    tcg_gen_movi_i32(tmp0, pc);
-    gen_helper_trace_newframe(tmp0);
-    tcg_temp_free_i32(tmp0);
-}
-
-static inline void gen_trace_endframe(uint32_t pc)
-{
-    TCGv_i32 tmp0 = tcg_temp_new_i32();
-    tcg_gen_movi_i32(tmp0, pc);
-    gen_helper_trace_endframe(cpu_env, tmp0);
-    tcg_temp_free_i32(tmp0);
-}
-#endif /* HAS_TRACEWRAP */
-
 static void sh4_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
 {
     CPUSH4State *env = cs->env_ptr;
@@ -2353,6 +2399,9 @@ static void sh4_tr_tb_stop(DisasContextBase *dcbase, CPUState *cs)
     case DISAS_TOO_MANY:
         gen_save_cpu_state(ctx, false);
         gen_goto_tb(ctx, 0, ctx->base.pc_next);
+    #ifdef HAS_TRACEWRAP
+        gen_trace_endframe(ctx->base.pc_next);
+    #endif
         break;
     case DISAS_NORETURN:
         break;
